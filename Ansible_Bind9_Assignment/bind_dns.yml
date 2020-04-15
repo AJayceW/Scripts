@@ -1,0 +1,97 @@
+- hosts: myUser
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  tasks:
+    - name: Install packages
+      action: >
+        {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+      with_items: 
+        - bind9
+        - bind9utils
+        - bind9-doc
+        - bind9-host
+        - iptables
+
+    - name: Restart bind9
+      service:
+        name: bind9
+        state: restarted
+
+    - name: Start bind9 on boot
+      service:
+        name: bind9
+        enabled: yes
+
+    - name: transfer new named.conf.options settings
+      copy:
+        src: ./named.conf.options
+        dest: /etc/bind/named.conf.options
+
+    - name: transfer new resolved.conf settings
+      copy:
+        src: ./resolved.conf
+        dest: /etc/systemd/resolved.conf
+
+    - name: transfer new named.conf.local settings
+      copy:
+        src: ./named.conf.local
+        dest: /etc/bind/named.conf.local
+
+    - name: transfer zone file
+      copy:
+        src: ./db.cybersecurity.bcit.ca
+        dest: /var/lib/bind/db.cybersecurity.bcit.ca
+
+    - name: Opening TCP/SSH
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 22
+        jump: ACCEPT
+
+    - name: Allowing outgoing SSH
+      iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination_port: 22
+        jump: ACCEPT
+
+    - name: OPENING UDP/DNS
+      iptables:
+        chain: INPUT
+        protocol: udp
+        destination_port: 53
+        jump: ACCEPT
+
+    - name: OPENING TCP/DNS
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 53
+        jump: ACCEPT
+
+    - name: Restart systemd-resolved
+      service:
+        name: systemd-resolved
+        state: restarted
+
+    - name: Restart bind9 again
+      service:
+        name: bind9
+        state: restarted
+
+#Probably best way to implement iptable rules is to create template file
+#transfer it over to host and then set it up as a daemon
+#which deletes itself after running
+#    - name: Dropping Input/OUTPUT
+#      iptables:
+#        chain: "{{ item }}"
+#        jump: DROP
+#      with_items: [ 'INPUT', 'OUTPUT' ]
+
+    - name: Restart firewall
+      service:
+        name: ufw
+        state: restarted

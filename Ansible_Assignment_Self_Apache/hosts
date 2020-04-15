@@ -1,0 +1,2 @@
+[myUser]
+142.232.166.71 ansible_connection=ssh ansible_user=bcit

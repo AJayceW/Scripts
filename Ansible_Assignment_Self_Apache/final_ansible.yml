@@ -1,0 +1,154 @@
+- hosts: myUser
+  become: yes
+  become_user: root
+  become_method: sudo
+  
+  tasks:
+    - name: Install packages
+      action: >
+        {{ ansible_pkg_mgr }} name={{ item }} state=present update_cache=yes
+      with_items: 
+        - apache2
+        - iptables
+
+    - name: Update System (raw)
+      raw: apt update && apt upgrade
+
+#Proper way, but also more prone to issue due to conflicts
+#    - name: Update System
+#      apt:
+#        name: "*"
+#        state: latest
+
+    - name: Transfer secured sshd config
+      copy: 
+        src: ./sshd_config
+        dest: /etc/ssh/sshd_config
+
+    - name: Transfer new warning banner
+      copy:
+        src: ./banner.net
+        dest: /etc/banner.net
+
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
+
+    - name: Create directory /etc/apache2/ssl
+      file:
+        path: /etc/apache2/ssl
+        state: directory
+
+    - name: Transfer apache.crt
+      copy:
+        src: ./apache.crt
+        dest: /etc/apache2/ssl/apache.crt
+
+    - name: Transfer apache.key
+      copy:
+        src: ./apache.key
+        dest: /etc/apache2/ssl/apache.key
+
+    - name: Transfer default-ssl.ssl.conf
+      copy:
+        src: ./default-ssl.ssl.conf
+        dest: /etc/apache2/sites-available/default-ssl.ssl.conf
+
+    - name: Enables ssl on apache2 (raw)
+      raw: a2enmod ssl
+
+    - name: Activate config of ssl (raw)
+      raw: a2ensite default-ssl.ssl.conf
+
+    - name: Restart apache2
+      service:
+        name: apache2
+        state: restarted
+
+    - name: Limit open files 2000
+      pam_limits: 
+        domain: '*'
+        limit_type: hard
+        limit_item: nofile
+        value: 2000
+
+    - name: Disable core dump
+      pam_limits: 
+        domain: '*'
+        limit_type: hard
+        limit_item: core
+        value: 0
+
+    - name: Limiting memory to 200mb
+      pam_limits: 
+        domain: '*'
+        limit_type: hard
+        limit_item: memlock
+        value: 200000
+
+#    - name: Flushing iptables filter
+#      iptables:
+#        chain: "{{ item }}"
+#        flush: yes
+#      with_items: [ 'INPUT', 'FORWARD', 'OUTPUT' ]
+
+    - name: Opening TCP/SSH
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 22
+        jump: ACCEPT
+
+    - name: Allowing outgoing SSH
+      iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination_port: 22
+        jump: ACCEPT
+
+    - name: OPENING TCP/HTTP
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 80
+        jump: ACCEPT
+
+    - name: Allowing outgoing TCP/HTTP
+      iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination_port: 80
+        jump: ACCEPT
+      
+    - name: OPENING TCP/HTTPS
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        destination_port: 443
+        jump: ACCEPT
+
+    - name: Allowing outgoing TCP/HTTPS
+      iptables:
+        chain: OUTPUT
+        protocol: tcp
+        destination_port: 443
+        jump: ACCEPT
+
+    - name: Disable ipv4 forwarding
+      iptables:
+        chain: FORWARD
+        ip_version: ipv4
+        jump: DROP
+
+    - name: Disable ping response
+      iptables:
+        chain: INPUT
+        protocol: icmp
+        icmp_type: echo-request
+        jump: DROP
+
+    - name: Restart ufw
+      service:
+        name: ufw
+        state: restarted

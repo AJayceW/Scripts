@@ -1,0 +1,13 @@
+$ORIGIN cybersecurity.bcit.ca.
+@   IN SOA ns1.cybersecurity.bcit.ca. student.cybersecurity.bcit.ca (
+    1   ; serial
+    3H  ; refresh
+    1H  ; retry
+    1W  ; expire
+    3H )    ; minimum   
+@   IN NS ns1.cybersecurity.bcit.ca.
+@    IN MX 10 mail.cybersecurity.bcit.ca.
+@    IN A 10.0.0.88
+ns1  IN A 10.0.0.7
+mail IN A 10.0.0.8
+www IN CNAME cybersecurity.bcit.ca.
